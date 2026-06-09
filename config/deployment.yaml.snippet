@@ -1,0 +1,45 @@
+# SWE-ReX scaffold deployment fragment for the on-prem isolated runtime bundle.
+#
+# Paste this under the per-instance docker deployment config of the scaffold.
+# Together with the bundle mounted at /opt/swerex-bundle on every worker, this
+# block makes the eval containers boot the runtime with zero outbound network
+# and zero apt/pipx steps.
+#
+env:
+  deployment:
+    # On-prem: never hit Docker Hub. Images must already be locally present.
+    pull: never
+
+    # Kill the apt-based pipx bootstrap. That's the path that was hitting the
+    # dead Debian mirror. Bundle replaces it.
+    install_pipx: false
+
+    # Kill the build-time standalone-Python download/patch path. The bundle
+    # provides standalone CPython already — we don't want the scaffold reaching
+    # out to fetch (and re-patch) another one.
+    python_standalone_dir: null
+
+    docker_args:
+      # Mount the prebuilt bundle read-only into every container at /opt/swerex.
+      # Read-only is safe: swe-rex writes tool bundles into /tmp inside the
+      # container, never into its install dir.
+      - "-v"
+      - "/opt/swerex-bundle:/opt/swerex:ro"
+
+      # Prepend the bundle's bin to PATH so the bare `swerex-remote` on the LEFT
+      # of the startup `swerex-remote || (pipx ...)` chain resolves to ours and
+      # SUCCEEDS — the pipx fallback then never runs.
+      # PATH must be absolute (no `$PATH` reference — that would expand on the
+      # host, not in the container). With Strategy B's RPATH'd binary we do NOT
+      # need LD_LIBRARY_PATH.
+      - "-e"
+      - "PATH=/opt/swerex/python/bin:/usr/local/bin:/usr/bin:/bin"
+
+# Notes:
+#   - Do NOT add `--network none`. The host's RemoteRuntime still connects to
+#     the in-container server over its published port. "Isolated" here means
+#     "no dependency on container userspace; no outbound internet needed" —
+#     not "no networking." Nothing in this bundle path makes outbound calls.
+#   - If you've already patched scaffold's docker.py to emit a custom command,
+#     the more robust alternative to the PATH trick is to have it call
+#     /opt/swerex/python/bin/swerex-remote by absolute path.
