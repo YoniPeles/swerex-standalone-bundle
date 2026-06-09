@@ -15,6 +15,29 @@ no outbound internet, glibc skews).
 The eval container's native toolchain (Go compiler, Node/pnpm, conda Python
 3.9) is left untouched. The bundle only hosts the swerex control channel.
 
+## Build process
+
+`make build` runs the compile step inside a `manylinux2014` builder container:
+it fetches the standalone CPython tarball, `pip install`s the pinned
+`swe-rex` into it, walks every ELF in the tree with `ldd` to copy the
+non-libc shared libraries it needs into `lib/`, and `patchelf`s an
+`$ORIGIN`-relative RPATH onto each one (Strategy B additionally bundles the
+dynamic loader + NSS plugins and rewrites the ELF interpreter). `make test`
+then mounts the resulting bundle read-only into a deliberately hostile
+`debian:oldstable` container with no usable Python of its own and runs
+`import pydantic_core, ssl, sqlite3` plus `swerex-remote --help` — and, under
+Strategy B, a real localhost bind/round-trip to flush NSS issues that only
+surface at run time.
+
+## Deployment
+
+Ship the built `out/swerex-bundle.tar.gz` via bidul. Extract it and mount the
+resulting directory into every eval container at a stable path, then point the
+SWE-ReX scaffold at that in-container path as its `python-standalone-dir` so
+the scaffold uses our bundled CPython + swe-rex instead of trying to download
+and patch its own at start-up. The exact flag names live in the SWE-ReX
+scaffold version we run — look them up there rather than copying defaults.
+
 ## Quickstart
 
 ```bash
@@ -37,10 +60,6 @@ make test
 make package                                  # writes out/swerex-bundle.tar.gz
 OCI_REGISTRY=registry.internal/swerex-bundle make package   # also push image
 ```
-
-Then on every worker node: extract the tarball to `/opt/swerex-bundle/` (or
-mount the OCI image into a host path) and add the YAML fragment in
-`config/deployment.yaml.snippet` to the SWE-ReX scaffold config.
 
 ## Strategies
 
@@ -77,8 +96,6 @@ Three values are not committed in this repo — fill them in via env vars on the
 .
 ├── Makefile                       one-command UX
 ├── README.md                      (this file)
-├── config/
-│   └── deployment.yaml.snippet    paste into the SWE-ReX scaffold config
 ├── docs/
 │   ├── 00-recon.md                why Phase 0 picks A vs B
 │   ├── 03-distribute.md           OCI image vs rsync tradeoffs
@@ -96,6 +113,6 @@ Three values are not committed in this repo — fill them in via env vars on the
 
 ## Rollback
 
-Pure run-time config change. Remove `docker_args` from the scaffold config and
-restore the previous values of `python_standalone_dir` and `install_pipx`.
+Pure run-time config change: stop pointing the scaffold at the bundle's
+`python-standalone-dir` and let it fall back to its previous bootstrap path.
 The eval images are never modified — nothing to rebuild on the image side.
