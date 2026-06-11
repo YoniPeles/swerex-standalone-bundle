@@ -2,8 +2,9 @@
 # Source this before `make recon` / `make build`.
 #   source scripts/env.sh
 
-# 1. swe-rex version pin (from SWE-bench Pro's SWE-agent submodule pyproject).
-export SWEREX_VERSION=1.2.0
+# 1. swe-rex is now pinned via the ./swe-rex submodule (YoniPeles/SWE-ReX),
+#    which carries the aiohttp-timeout fix. Move the pin with
+#    `git -C swe-rex fetch && git -C swe-rex checkout <ref> && git commit`.
 
 # 2. Standalone CPython tarball.
 #    Upstream URL for local/online testing. For on-prem deploy, swap the host
@@ -31,6 +32,6 @@ export IMAGES="\
 #     | docker login --username AWS --password-stdin 084828598639.dkr.ecr.us-west-2.amazonaws.com
 
 echo "swerex-bundle env loaded:"
-echo "  SWEREX_VERSION=$SWEREX_VERSION"
+echo "  swe-rex pin: ./swe-rex submodule @ $(git -C "$(dirname "${BASH_SOURCE[0]}")/.." submodule status swe-rex 2>/dev/null | awk '{print $1, $3}')"
 echo "  PYTHON_TARBALL_URL=$PYTHON_TARBALL_URL"
 echo "  IMAGES=$(echo $IMAGES | wc -w) tags"

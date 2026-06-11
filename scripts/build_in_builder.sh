@@ -3,7 +3,10 @@
 # Runs inside the manylinux2014 builder. Do not invoke directly — use
 # scripts/build_bundle.sh on the host. This script assumes:
 #   - /out is a writable mount that will become the operator's ./out
-#   - SWEREX_VERSION, PYTHON_TARBALL_URL, BUNDLE_STRATEGY are set
+#   - /src/swe-rex is the read-only YoniPeles/SWE-ReX submodule checkout
+#   - PYTHON_TARBALL_URL, BUNDLE_STRATEGY are set
+#   - SWEREX_DESCRIBE / SWEREX_SHA are set by build_bundle.sh for the version
+#     stamp at the end (informational only)
 #   - patchelf is on PATH (manylinux images ship it)
 #
 # Produces /out/swerex/ with:
@@ -13,9 +16,16 @@
 
 set -euxo pipefail
 
-: "${SWEREX_VERSION:?}"
 : "${PYTHON_TARBALL_URL:?}"
 STRATEGY="${BUNDLE_STRATEGY:-A}"
+SWEREX_SRC=/src/swe-rex
+SWEREX_DESCRIBE="${SWEREX_DESCRIBE:-unknown}"
+SWEREX_SHA="${SWEREX_SHA:-unknown}"
+
+test -f "$SWEREX_SRC/pyproject.toml" || {
+  echo "Expected swe-rex source at $SWEREX_SRC (mount the submodule)" >&2
+  exit 2
+}
 
 # Build at the path the bundle will be MOUNTED at in the eval container.
 # pip bakes shebangs as #!$DEST/python/bin/python3 — if $DEST != mount path,
@@ -34,7 +44,12 @@ curl -fL -o /tmp/py.tgz "$PYTHON_TARBALL_URL"
 tar -xzf /tmp/py.tgz -C "$DEST"
 test -x "$DEST/python/bin/python3"
 
-# ---- 2. install swe-rex (PINNED) ----
+# ---- 2. install swe-rex from the vendored submodule ----
+# The submodule SHA is the pin: it carries our aiohttp-timeout fix so the
+# harness's 30-min BashAction.timeout isn't silently capped at aiohttp's
+# default 5 min. We copy the tree to a writable path because pip writes
+# build artifacts (egg-info, build/) next to pyproject.toml.
+cp -a "$SWEREX_SRC" /tmp/swe-rex-src
 PIP_ARGS=()
 if [[ -n "${EXTRA_PIP_INDEX:-}" ]]; then
   PIP_ARGS+=(--extra-index-url "$EXTRA_PIP_INDEX")
@@ -43,7 +58,7 @@ fi
 # a bare "${PIP_ARGS[@]}" trips `set -u` on bash <5.2.
 "$DEST/python/bin/python3" -m pip install --no-cache-dir \
   ${PIP_ARGS[@]+"${PIP_ARGS[@]}"} \
-  "swe-rex==$SWEREX_VERSION"
+  /tmp/swe-rex-src
 
 # ---- 3. collect shared library deps ----
 # copy_deps <elf>: append non-libc shared-lib deps of <elf> into $LIBDIR.
@@ -106,4 +121,4 @@ echo "== readelf on python3 =="
 readelf -d "$DEST/python/bin/python3" | grep -E 'RPATH|RUNPATH|INTERP|NEEDED' || true
 
 echo
-echo "Build complete: strategy=$STRATEGY, swe-rex=$SWEREX_VERSION"
+echo "Build complete: strategy=$STRATEGY, swe-rex=$SWEREX_DESCRIBE ($SWEREX_SHA)"

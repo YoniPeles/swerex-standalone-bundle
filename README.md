@@ -46,8 +46,9 @@ scaffold version we run — look them up there rather than copying defaults.
 # 1. Recon the 11 base images — picks Strategy A vs B for you.
 IMAGES="jefzda/sweap-images:repo1 jefzda/sweap-images:repo2 ..." make recon
 
-# 2. Build the bundle (Strategy A is the default).
-SWEREX_VERSION=1.2.3 \
+# 2. Build the bundle (Strategy A is the default). swe-rex is pinned via the
+#    ./swe-rex submodule (forked YoniPeles/SWE-ReX), not an env var.
+git submodule update --init
 PYTHON_TARBALL_URL=https://mirror.internal/cpython-3.11.x+date-...-gnu-install_only.tar.gz \
   make build
 # If recon said B:
@@ -76,13 +77,13 @@ OCI_REGISTRY=registry.internal/swerex-bundle make package   # also push image
 
 ## Decisions to make before first build
 
-Three values are not committed in this repo — fill them in via env vars on the
-`make build` command (or export them shell-wide):
-
-1. **`SWEREX_VERSION`** — pin to the *exact* swe-rex version the SWE-bench Pro
-   scaffold's SWE-agent submodule depends on. Read it from that submodule's
-   lockfile/pyproject; do not take latest. A skew here surfaces at *connect
-   time*, not build time, so it is load-bearing. (Risks #1 in `docs/risks.md`.)
+1. **swe-rex pin** — committed in this repo as the `./swe-rex` submodule
+   (`YoniPeles/SWE-ReX`, branch `swerex-bundle-patches`, carries our
+   aiohttp-timeout fix). The submodule SHA is the pin; align it to the
+   swe-rex version the SWE-bench Pro scaffold's SWE-agent submodule depends
+   on with `git -C swe-rex fetch && git -C swe-rex checkout <ref>` and
+   commit the resulting gitlink change. A skew surfaces at *connect time*,
+   not build time, so it is load-bearing. (Risks #1 in `docs/risks.md`.)
 2. **`PYTHON_TARBALL_URL`** — internal-mirror URL of the standalone CPython
    `…-x86_64-unknown-linux-gnu-install_only.tar.gz` tarball you already vendor.
    Use *gnu* (not musl) so compiled extensions like pydantic-core dlopen

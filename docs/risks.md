@@ -13,9 +13,11 @@ A skew here fails at *connect* time (with cryptic protocol errors), not at
 build time, so it is easy to miss until you're staring at hundreds of failed
 runs.
 
-**Mitigation:** set `SWEREX_VERSION` deliberately; commit the value used into
-your run notes; include the version in the bundle's directory name on workers
-(e.g. `/opt/swerex-bundle-1.2.3/`) so it's visible at runtime.
+**Mitigation:** the swe-rex pin lives in the `./swe-rex` submodule
+(`YoniPeles/SWE-ReX`). Move it deliberately with `git -C swe-rex checkout
+<ref> && git commit`; the submodule SHA in `git log` is the audit trail.
+Include the SHA (or describe output) in the bundle's directory name on
+workers (e.g. `/opt/swerex-bundle-<sha>/`) so it's visible at runtime.
 
 ## 2. NSS footgun (Strategy B only)
 

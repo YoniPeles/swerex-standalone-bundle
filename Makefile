@@ -12,7 +12,6 @@ TARBALL        := $(OUT_DIR)/swerex-bundle.tar.gz
 
 # Overridable on the command line / env.
 STRATEGY            ?= A
-SWEREX_VERSION      ?=
 PYTHON_TARBALL_URL  ?=
 IMAGES              ?=
 FLOOR               ?= 2.17
@@ -21,7 +20,10 @@ TEST_IMAGE          ?= debian:oldstable
 OCI_REGISTRY        ?=
 OCI_TAG             ?= latest
 
-export SWEREX_VERSION PYTHON_TARBALL_URL BUILDER_IMAGE TEST_IMAGE OCI_REGISTRY OCI_TAG IMAGES FLOOR
+# swe-rex is pinned via the ./swe-rex submodule (YoniPeles/SWE-ReX). Move the
+# pin by checking out a new SHA in the submodule and committing the gitlink.
+
+export PYTHON_TARBALL_URL BUILDER_IMAGE TEST_IMAGE OCI_REGISTRY OCI_TAG IMAGES FLOOR
 
 .PHONY: help recon build test package all clean
 
@@ -34,7 +36,7 @@ help:
 	@echo "  all      - recon + build + test + package"
 	@echo "  clean    - rm -rf out/"
 	@echo ""
-	@echo "Required vars for build: SWEREX_VERSION, PYTHON_TARBALL_URL"
+	@echo "Required vars for build: PYTHON_TARBALL_URL (swe-rex comes from ./swe-rex submodule)"
 	@echo "Required vars for recon: IMAGES (space-separated tags)"
 
 recon:
