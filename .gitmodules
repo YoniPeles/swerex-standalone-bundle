@@ -1,0 +1,3 @@
+[submodule "swe-rex"]
+	path = swe-rex
+	url = git@github.com:YoniPeles/SWE-ReX.git
